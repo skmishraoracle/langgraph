@@ -58,12 +58,10 @@ class TestOracleCheckpointer:
         self.metadata_1: CheckpointMetadata = {
             "source": "input",
             "step": 2,
-            "writes": {},
         }
         self.metadata_2: CheckpointMetadata = {
             "source": "loop",
             "step": 1,
-            "writes": {"foo": "bar"},
         }
         self.metadata_3: CheckpointMetadata = {}
 
