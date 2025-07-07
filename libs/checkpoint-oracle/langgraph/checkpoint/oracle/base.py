@@ -39,7 +39,7 @@ def get_connection(conn: Conn) -> oracledb.Connection:
 
 
 class BaseOracleCheckpointer(
-        BaseCheckpointSaver[str]):  # Changed to match PostgreSQL
+        BaseCheckpointSaver[str]): 
     """Base class for Oracle checkpoint savers.
 
     This provides common functionality for both synchronous and asynchronous
@@ -51,7 +51,7 @@ class BaseOracleCheckpointer(
         _table_prefix: Prefix for database tables
     """
 
-    # Add JsonPlusSerializer like PostgreSQL implementation
+    # Add JsonPlusSerializer 
     jsonplus_serde = JsonPlusSerializer()
 
     # Simplified migration approach for initial Oracle port
@@ -70,7 +70,7 @@ class BaseOracleCheckpointer(
         PRIMARY KEY (thread_id, checkpoint_ns, checkpoint_id)
     )""",
 
-        # Note: Changed to match PostgreSQL - added version field
+        # Added version field
         """CREATE TABLE checkpoint_blobs (
         thread_id VARCHAR2(2000) NOT NULL,
         checkpoint_ns VARCHAR2(2000) NOT NULL DEFAULT '',
@@ -102,7 +102,6 @@ class BaseOracleCheckpointer(
     ]
 
     # Oracle uses MERGE INTO for upserts
-    # Updated to match PostgreSQL - added version parameter
     UPSERT_CHECKPOINT_BLOBS_SQL = """
         MERGE INTO checkpoint_blobs target
         USING (SELECT :1 AS thread_id, :2 AS checkpoint_ns, :3 AS channel,
@@ -252,7 +251,6 @@ class BaseOracleCheckpointer(
         Returns:
             dict: Dictionary representation of checkpoint
         """
-        # Match PostgreSQL implementation
         return {**checkpoint, "pending_sends": []}
 
     def _dump_metadata(self, metadata: CheckpointMetadata) -> str:
@@ -264,7 +262,6 @@ class BaseOracleCheckpointer(
         Returns:
             str: JSON string representation of metadata
         """
-        # Match PostgreSQL implementation
         serialized_metadata = self.jsonplus_serde.dumps(metadata)
         # NOTE: we're using JSON serializer (not msgpack), so we need to remove
         # null characters before writing
@@ -286,7 +283,6 @@ class BaseOracleCheckpointer(
         Returns:
             Checkpoint: The reconstructed checkpoint
         """
-        # Match PostgreSQL implementation
         result = cast(Checkpoint, {
             **checkpoint,
             "pending_sends": [
@@ -307,7 +303,6 @@ class BaseOracleCheckpointer(
         Returns:
             dict: Dictionary of channel -> value
         """
-        # Added to match PostgreSQL implementation
         if not blob_values:
             return {}
 
@@ -338,7 +333,6 @@ class BaseOracleCheckpointer(
         Returns:
             CheckpointMetadata: The reconstructed metadata
         """
-        # Match PostgreSQL implementation
         return self.jsonplus_serde.loads(
             self.jsonplus_serde.dumps(
                 json.loads(metadata_json)))
@@ -353,7 +347,6 @@ class BaseOracleCheckpointer(
         Returns:
             List[Tuple[str, str, Any]]: List of (task_id, channel, value) tuples
         """
-        # Updated to match PostgreSQL implementation
         return (
             [
                 (
@@ -389,7 +382,6 @@ class BaseOracleCheckpointer(
         Returns:
             List[Tuple]: Parameters for database insert/update
         """
-        # Updated to match PostgreSQL implementation
         return [
             (
                 thread_id,
@@ -397,7 +389,6 @@ class BaseOracleCheckpointer(
                 checkpoint_id,
                 task_id,
                 task_path,
-                # Changed to match PostgreSQL
                 WRITES_IDX_MAP.get(channel, idx),
                 channel,
                 *self.serde.dumps_typed(value),
@@ -423,7 +414,6 @@ class BaseOracleCheckpointer(
         Returns:
             List[Tuple]: Parameters for database insert/update
         """
-        # Updated to match PostgreSQL implementation with version field
         if not versions:
             return []
 
@@ -492,7 +482,7 @@ class BaseOracleCheckpointer(
             args.append(before_id)
 
         if filter:
-            # Oracle JSON path expressions are different from PostgreSQL
+            # Oracle JSON path expressions
             # Need to use proper Oracle JSON_EXISTS and JSON_VALUE functions
             idx = len(args) + 1
             for key, value in filter.items():
@@ -521,7 +511,6 @@ class BaseOracleCheckpointer(
         Returns:
             str: Next version
         """
-        # Added to match PostgreSQL implementation
         if current is None:
             current_v = 0
         elif isinstance(current, int):
