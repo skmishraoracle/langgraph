@@ -39,3 +39,13 @@
     options:
       members:
         - AsyncPostgresSaver
+
+::: langgraph.checkpoint.oracle
+    options:
+      members:
+        - OracleSaver
+
+::: langgraph.checkpoint.oracle.aio
+    options:
+      members:
+        - AsyncOracleSaver
