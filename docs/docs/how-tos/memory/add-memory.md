@@ -154,6 +154,117 @@ with PostgresSaver.from_conn_string(DB_URI) as checkpointer:
 
     
 
+??? example "Example: using [Oracle](https://pypi.org/project/langgraph-checkpoint-oracle/) checkpointer"
+
+    ```
+    pip install -U oracledb langgraph langgraph-checkpoint-oracle
+    ```
+
+    !!! Setup
+        You need to call `checkpointer.setup()` the first time you're using Oracle checkpointer
+
+    === "Sync"
+
+        ```python
+        from langchain.chat_models import init_chat_model
+        from langgraph.graph import StateGraph, MessagesState, START
+        # highlight-next-line
+        from langgraph.checkpoint.oracle import OracleCheckpointer
+        
+        model = init_chat_model(model="anthropic:claude-3-5-haiku-latest")
+        
+        DB_URI = "username/password@localhost:1521/service"
+        # highlight-next-line
+        with OracleCheckpointer.from_conn_string(DB_URI) as checkpointer:
+            # checkpointer.setup()
+        
+            def call_model(state: MessagesState):
+                response = model.invoke(state["messages"])
+                return {"messages": response}
+        
+            builder = StateGraph(MessagesState)
+            builder.add_node(call_model)
+            builder.add_edge(START, "call_model")
+            
+            # highlight-next-line
+            graph = builder.compile(checkpointer=checkpointer)
+        
+            config = {
+                "configurable": {
+                    # highlight-next-line
+                    "thread_id": "1"
+                }
+            }
+        
+            for chunk in graph.stream(
+                {"messages": [{"role": "user", "content": "hi! I'm bob"}]},
+                # highlight-next-line
+                config,
+                stream_mode="values"
+            ):
+                chunk["messages"][-1].pretty_print()
+            
+            for chunk in graph.stream(
+                {"messages": [{"role": "user", "content": "what's my name?"}]},
+                # highlight-next-line
+                config,
+                stream_mode="values"
+            ):
+                chunk["messages"][-1].pretty_print()
+        ```
+
+    === "Async"
+
+        ```python
+        from langchain.chat_models import init_chat_model
+        from langgraph.graph import StateGraph, MessagesState, START
+        # highlight-next-line
+        from langgraph.checkpoint.oracle.aio import AsyncOracleCheckpointer
+        
+        model = init_chat_model(model="anthropic:claude-3-5-haiku-latest")
+        
+        DB_URI = "username/password@localhost:1521/service"
+        # highlight-next-line
+        async with AsyncOracleCheckpointer.from_conn_string(DB_URI) as checkpointer:
+            # await checkpointer.setup()
+        
+            async def call_model(state: MessagesState):
+                response = await model.ainvoke(state["messages"])
+                return {"messages": response}
+        
+            builder = StateGraph(MessagesState)
+            builder.add_node(call_model)
+            builder.add_edge(START, "call_model")
+            
+            # highlight-next-line
+            graph = builder.compile(checkpointer=checkpointer)
+        
+            config = {
+                "configurable": {
+                    # highlight-next-line
+                    "thread_id": "1"
+                }
+            }
+        
+            async for chunk in graph.astream(
+                {"messages": [{"role": "user", "content": "hi! I'm bob"}]},
+                # highlight-next-line
+                config,
+                stream_mode="values"
+            ):
+                chunk["messages"][-1].pretty_print()
+            
+            async for chunk in graph.astream(
+                {"messages": [{"role": "user", "content": "what's my name?"}]},
+                # highlight-next-line
+                config,
+                stream_mode="values"
+            ):
+                chunk["messages"][-1].pretty_print()
+        ```
+
+    
+
 ??? example "Example: using [MongoDB](https://pypi.org/project/langgraph-checkpoint-mongodb/) checkpointer"
 
     ```
@@ -666,6 +777,199 @@ with PostgresStore.from_conn_string(DB_URI) as store:
             # highlight-next-line
             AsyncPostgresStore.from_conn_string(DB_URI) as store,
             AsyncPostgresSaver.from_conn_string(DB_URI) as checkpointer,
+        ):
+            # await store.setup()
+            # await checkpointer.setup()
+        
+            async def call_model(
+                state: MessagesState,
+                config: RunnableConfig,
+                *,
+                # highlight-next-line
+                store: BaseStore,
+            ):
+                user_id = config["configurable"]["user_id"]
+                namespace = ("memories", user_id)
+                # highlight-next-line
+                memories = await store.asearch(namespace, query=str(state["messages"][-1].content))
+                info = "\n".join([d.value["data"] for d in memories])
+                system_msg = f"You are a helpful assistant talking to the user. User info: {info}"
+            
+                # Store new memories if the user asks the model to remember
+                last_message = state["messages"][-1]
+                if "remember" in last_message.content.lower():
+                    memory = "User name is Bob"
+                    # highlight-next-line
+                    await store.aput(namespace, str(uuid.uuid4()), {"data": memory})
+        
+                response = await model.ainvoke(
+                    [{"role": "system", "content": system_msg}] + state["messages"]
+                )
+                return {"messages": response}
+        
+            builder = StateGraph(MessagesState)
+            builder.add_node(call_model)
+            builder.add_edge(START, "call_model")
+            
+            graph = builder.compile(
+                checkpointer=checkpointer,
+                # highlight-next-line
+                store=store,
+            )
+        
+            config = {
+                "configurable": {
+                    # highlight-next-line
+                    "thread_id": "1",
+                    # highlight-next-line
+                    "user_id": "1",
+                }
+            }
+            async for chunk in graph.astream(
+                {"messages": [{"role": "user", "content": "Hi! Remember: my name is Bob"}]},
+                # highlight-next-line
+                config,
+                stream_mode="values",
+            ):
+                chunk["messages"][-1].pretty_print()
+            
+            config = {
+                "configurable": {
+                    # highlight-next-line
+                    "thread_id": "2",
+                    "user_id": "1",
+                }
+            }
+        
+            async for chunk in graph.astream(
+                {"messages": [{"role": "user", "content": "what is my name?"}]},
+                # highlight-next-line
+                config,
+                stream_mode="values",
+            ):
+                chunk["messages"][-1].pretty_print()
+        ```
+
+??? example "Example: using [Oracle](https://pypi.org/project/langgraph-checkpoint-oracle/) store"
+
+    ```
+    pip install -U oracledb langgraph langgraph-checkpoint-oracle
+    ```
+
+    !!! Setup
+        You need to call `store.setup()` the first time you're using Oracle store
+
+    === "Sync"
+
+        ```python
+        from langchain_core.runnables import RunnableConfig
+        from langchain.chat_models import init_chat_model
+        from langgraph.graph import StateGraph, MessagesState, START
+        from langgraph.checkpoint.oracle import OracleCheckpointer
+        # highlight-next-line
+        from langgraph.store.oracle import OracleStore
+        from langgraph.store.base import BaseStore
+        
+        model = init_chat_model(model="anthropic:claude-3-5-haiku-latest")
+        
+        DB_URI = "username/password@localhost:1521/service"
+        
+        with (
+            # highlight-next-line
+            OracleStore.from_conn_string(DB_URI) as store,
+            OracleCheckpointer.from_conn_string(DB_URI) as checkpointer,
+        ):
+            # store.setup()
+            # checkpointer.setup()
+        
+            def call_model(
+                state: MessagesState,
+                config: RunnableConfig,
+                *,
+                # highlight-next-line
+                store: BaseStore,
+            ):
+                user_id = config["configurable"]["user_id"]
+                namespace = ("memories", user_id)
+                # highlight-next-line
+                memories = store.search(namespace, query=str(state["messages"][-1].content))
+                info = "\n".join([d.value["data"] for d in memories])
+                system_msg = f"You are a helpful assistant talking to the user. User info: {info}"
+            
+                # Store new memories if the user asks the model to remember
+                last_message = state["messages"][-1]
+                if "remember" in last_message.content.lower():
+                    memory = "User name is Bob"
+                    # highlight-next-line
+                    store.put(namespace, str(uuid.uuid4()), {"data": memory})
+            
+                response = model.invoke(
+                    [{"role": "system", "content": system_msg}] + state["messages"]
+                )
+                return {"messages": response}
+        
+            builder = StateGraph(MessagesState)
+            builder.add_node(call_model)
+            builder.add_edge(START, "call_model")
+            
+            graph = builder.compile(
+                checkpointer=checkpointer,
+                # highlight-next-line
+                store=store,
+            )
+        
+            config = {
+                "configurable": {
+                    # highlight-next-line
+                    "thread_id": "1",
+                    # highlight-next-line
+                    "user_id": "1",
+                }
+            }
+            for chunk in graph.stream(
+                {"messages": [{"role": "user", "content": "Hi! Remember: my name is Bob"}]},
+                # highlight-next-line
+                config,
+                stream_mode="values",
+            ):
+                chunk["messages"][-1].pretty_print()
+            
+            config = {
+                "configurable": {
+                    # highlight-next-line
+                    "thread_id": "2",
+                    "user_id": "1",
+                }
+            }
+        
+            for chunk in graph.stream(
+                {"messages": [{"role": "user", "content": "what is my name?"}]},
+                # highlight-next-line
+                config,
+                stream_mode="values",
+            ):
+                chunk["messages"][-1].pretty_print()
+        ```
+
+    === "Async"
+
+        ```python
+        from langchain_core.runnables import RunnableConfig
+        from langchain.chat_models import init_chat_model
+        from langgraph.graph import StateGraph, MessagesState, START
+        from langgraph.checkpoint.oracle.aio import AsyncOracleCheckpointer
+        # highlight-next-line
+        from langgraph.store.oracle.aio import AsyncOracleStore
+        from langgraph.store.base import BaseStore
+        
+        model = init_chat_model(model="anthropic:claude-3-5-haiku-latest")
+        
+        DB_URI = "username/password@localhost:1521/service"
+        
+        async with (
+            # highlight-next-line
+            AsyncOracleStore.from_conn_string(DB_URI) as store,
+            AsyncOracleCheckpointer.from_conn_string(DB_URI) as checkpointer,
         ):
             # await store.setup()
             # await checkpointer.setup()

@@ -458,6 +458,7 @@ Under the hood, checkpointing is powered by checkpointer objects that conform to
 * `langgraph-checkpoint`: The base interface for checkpointer savers ([BaseCheckpointSaver][langgraph.checkpoint.base.BaseCheckpointSaver]) and serialization/deserialization interface ([SerializerProtocol][langgraph.checkpoint.serde.base.SerializerProtocol]). Includes in-memory checkpointer implementation ([InMemorySaver][langgraph.checkpoint.memory.InMemorySaver]) for experimentation. LangGraph comes with `langgraph-checkpoint` included.
 * `langgraph-checkpoint-sqlite`: An implementation of LangGraph checkpointer that uses SQLite database ([SqliteSaver][langgraph.checkpoint.sqlite.SqliteSaver] / [AsyncSqliteSaver][langgraph.checkpoint.sqlite.aio.AsyncSqliteSaver]). Ideal for experimentation and local workflows. Needs to be installed separately.
 * `langgraph-checkpoint-postgres`: An advanced checkpointer that uses Postgres database ([PostgresSaver][langgraph.checkpoint.postgres.PostgresSaver] / [AsyncPostgresSaver][langgraph.checkpoint.postgres.aio.AsyncPostgresSaver]), used in LangGraph Platform. Ideal for using in production. Needs to be installed separately.
+* `langgraph-checkpoint-oracle`: An implementation of LangGraph checkpointer that uses Oracle database ([OracleCheckpointer][langgraph.checkpoint.oracle.OracleCheckpointer] / [AsyncOracleCheckpointer][langgraph.checkpoint.oracle.aio.AsyncOracleCheckpointer]). Ideal for enterprise environments using Oracle Database. Needs to be installed separately.
 
 
 ### Checkpointer interface
@@ -472,7 +473,7 @@ Each checkpointer conforms to [BaseCheckpointSaver][langgraph.checkpoint.base.Ba
 If the checkpointer is used with asynchronous graph execution (i.e. executing the graph via `.ainvoke`, `.astream`, `.abatch`), asynchronous versions of the above methods will be used (`.aput`, `.aput_writes`, `.aget_tuple`, `.alist`).
 
 !!! note Note
-    For running your graph asynchronously, you can use `InMemorySaver`, or async versions of Sqlite/Postgres checkpointers -- `AsyncSqliteSaver` / `AsyncPostgresSaver` checkpointers.
+    For running your graph asynchronously, you can use `InMemorySaver`, or async versions of Sqlite/Postgres/Oracle checkpointers -- `AsyncSqliteSaver` / `AsyncPostgresSaver` / `AsyncOracleCheckpointer` checkpointers.
 
 ### Serializer
 
@@ -516,6 +517,15 @@ from langgraph.checkpoint.postgres import PostgresSaver
 
 serde = EncryptedSerializer.from_pycryptodome_aes()
 checkpointer = PostgresSaver.from_conn_string("postgresql://...", serde=serde)
+checkpointer.setup()
+```
+
+```python
+from langgraph.checkpoint.serde.encrypted import EncryptedSerializer
+from langgraph.checkpoint.oracle import OracleCheckpointer
+
+serde = EncryptedSerializer.from_pycryptodome_aes()
+checkpointer = OracleCheckpointer.from_conn_string("username/password@localhost:1521/service", serde=serde)
 checkpointer.setup()
 ```
 

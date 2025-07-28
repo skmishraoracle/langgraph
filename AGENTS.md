@@ -23,6 +23,7 @@ Below is a high-level overview:
 
 - **checkpoint** – base interfaces for LangGraph checkpointers.
 - **checkpoint-postgres** – Postgres implementation of the checkpoint saver.
+- **checkpoint-oracle** – Oracle implementation of the checkpoint saver.
 - **checkpoint-sqlite** – SQLite implementation of the checkpoint saver.
 - **cli** – official command-line interface for LangGraph.
 - **langgraph** – core framework for building stateful, multi-actor agents.
@@ -38,6 +39,7 @@ declared in that library's `pyproject.toml` (or `package.json`).
 ```text
 checkpoint
 ├── checkpoint-postgres
+├── checkpoint-oracle
 ├── checkpoint-sqlite
 ├── prebuilt
 └── langgraph
